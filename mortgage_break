@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-Created on Sun Mar  7 22:16:57 2021
+Created on Tue Mar  9 14:30:26 2021
 
 @author: luke3
 """
@@ -14,67 +14,107 @@ import time
 import random
 import decimal
 from numpy.random import normal
+from numpy.random import gamma
 import matplotlib.pyplot as plt
 import numpy_financial as npf
 
-      
-def create_df(count):    
-    
-    # uniform distribution of term in years
-    years = 20 # random.randint(20,30)
-    print("Term in years: " + str(years))
-    
-    payments_year = 12
-        
-    # normal distribution to calculate mortgage amount
-    original_mortgage = 500000 #abs(np.round(normal(loc=400000, scale=150000),0)) #, size = 5000)
-    print("Mortgage principal: €"+ str(original_mortgage))
 
-    # start mortgage on 1st day of a random month between 2000 and 2005
-    beginning_date = datetime.date(2000, 1, 1) 
-    add_random_months = 36 #(random.randint(1,60))
+
+
+def create_df(count): 
+    
+    # random number of years of mortgage 
+    global years # global variables so they can be used in next function withou break
+    years = random.randint(22,30)
+    print("Term in years: " + str(years))
+        
+    # monthly payments
+    global payments_year
+    payments_year = 12
+    
+    # gamma distribution to choose mortgage principal
+    global original_mortgage
+    #original_mortgage = abs(np.round(normal(loc=400000, scale=150000),0)) 
+    original_mortgage = int(np.round(gamma(shape=2500, scale=150, size=1),2))
+    print("Mortgage principal: €"+ str(original_mortgage))
+    
+    # start mortgage on 1st day of a random month between 2001 and 2005
+    beginning_date = datetime.date(1998, 1, 1) 
+    global add_random_months
+    add_random_months = (random.randint(36,60))
+    
+    # random start date found by adding random amount of months to a fixed date
+    global start_date
     start_date = (beginning_date + pd.DateOffset(months=add_random_months)).to_pydatetime().date()
     print("Start date: " + str(start_date))
-    end_date = (start_date + pd.DateOffset(years=years)).to_pydatetime().date()
-    print("End date: " + str(end_date))     
     
+    # end date is start date plus term in years
+    global end_date
+    end_date = (start_date + pd.DateOffset(years=years)).to_pydatetime().date()
+    print("End date: " + str(end_date))
+            
     # pick a random number of years for the fixed period at 5%
-    fixed_years = 2 #(random.randint(1,3))
+    global fixed_years
+    fixed_years = (random.randint(1,3)) # fixed period between 1 and 3 years
+    
+    # end of fixed period is start date plus fixed period length. Fixed period start is start date of mortgage
+    global fixed_period_end
     fixed_period_end = (start_date + pd.DateOffset(years=fixed_years)).to_pydatetime().date()
     print("Fixed period: " + str(fixed_years) + " years")
     print("End of fixed period: " + str(fixed_period_end))
+    
+    # find month before end of fixed period to calculate remaining balance at that period
+    global month_before_fixed_period_end
     month_before_fixed_period_end = fixed_period_end - pd.DateOffset(months=1)
     print("Month before fixed period end " + str(month_before_fixed_period_end))
     print("Fixed period interest: 5%")
-                   
+       
+    # number of months in which break can be taken
+    months_until_end = (end_date.year - date(2019, 1, 1).year)*12 + (end_date.month - date(2019, 1, 1).month)
+    print("Months until end of mortgage where break may be taken: " + str(months_until_end))
+    
+    # fixed start date to calculate random dates for break. Only available in last interest period.
+    start_break = datetime.date(2019, 1, 1) 
+    
+    # add random number to fixed date to find start of mortgage break
+    add_random_months_to_start_date = (random.randint(1,months_until_end-12)) # no breaks allowed in last year of mortgage   
+    start_break_date = (start_break + pd.DateOffset(months=add_random_months_to_start_date)).to_pydatetime().date()
+    print("Start of break date: " + str(start_break_date))
+   
+    # lenght of break is a random number of month between 3 and 6 months
+    random_break_length = (random.randint(3,6))
+    print("Length of break in months: " + str(random_break_length))
+    end_break_date = (start_break_date + pd.DateOffset(months=random_break_length)).to_pydatetime().date()
+    print("End of break date: " + str(end_break_date))
+          
+    print("---------------CALCULATE PMT-------------") 
+         
+    # create dataframe with blank columns and index the length of the mortgage   
     rng = pd.date_range(start_date, periods=(years * payments_year), freq='MS')
     rng.name = "Payment Date"
     df2 = pd.DataFrame(index=rng, columns=['Remaining period', 'Current balance', 'Interest Rate', 'Payment', 'Principal Paid', 'Interest Paid', 'To be paid', 'Ending Balance'], dtype='float')
-    #df = pd.DataFrame(columns=['Payment', 'Principal Paid', 'Interest Paid', 'Ending Balance'], dtype='float')
     df2.reset_index(inplace=True)
-    #df2.index = len(df2)
     df2.index += 1
     df2.index.name = "Period" 
-    #df2.string = str(df2.index)
     print("Length of mortgage in months: " + str(len(df2)))
-    #remaining_period2 = len(df2)
     remaining_period2 = ((int(len(df2))))
     
     df2['Remaining period'] = range(remaining_period2, 0, -1)
-    
+       
+    ### length of each interest period in months
     end_of_fixed_to_end_of_mort = (end_date.year - fixed_period_end.year)*12 + (end_date.month - fixed_period_end.month)
-    print("End of fixed period to end of mortgage: " + str(end_of_fixed_to_end_of_mort/12))
+    #print("End of fixed period to end of mortgage: " + str(end_of_fixed_to_end_of_mort/12))
     
     int_rate_1_period = (end_date.year - date(2014, 1, 1).year)*12 + (end_date.month - date(2014, 1, 1).month)
-    print("Length of first period in years: " + str(int_rate_1_period/12))
+    #print("Length of first period in years: " + str(int_rate_1_period/12))
     
     int_rate_2_period = (end_date.year - date(2019, 1, 1).year)*12 + (end_date.month - date(2019, 1, 1).month)
-    print("Length of second period in years: " + str(int_rate_2_period/12))
+    #print("Length of second period in years: " + str(int_rate_2_period/12))
     
-    end_of_break_to_end = (end_date.year - date(2020, 4, 1).year)*12 + (end_date.month - date(2020, 4, 1).month)
-    print("End of break to end of mortgage: " + str(end_of_break_to_end/12))
+    end_of_break_to_end = (end_date.year - (end_break_date).year)*12 + (end_date.month - (end_break_date).month)
+    #print("End of break to end of mortgage: " + str(end_of_break_to_end/12))
         
-     
+    # assign interest rate to each payment depending on date
     df2.loc[df2['Payment Date'] < str(fixed_period_end), 'Interest Rate'] = 5           
     df2.loc[(df2['Payment Date'] < '2014-1-1') & (df2['Payment Date'] >= str(fixed_period_end)), 'Interest Rate'] = 3
     df2.loc[(df2['Payment Date'] >= '2014-1-1') & (df2['Payment Date'] < '2019-1-1') & (df2['Payment Date'] > str(fixed_period_end)), 'Interest Rate'] = 2.15
@@ -83,39 +123,40 @@ def create_df(count):
     
     df2.loc[1, 'Current balance'] = original_mortgage
     
+    # amount of payments remaining to calculate PMT function at each change in interest rate
     df2.loc[df2['Payment Date'] < str(fixed_period_end), 'Remaining months'] = years*12
     df2.loc[(df2['Payment Date'] < '2014-1-1') & (df2['Payment Date'] >= str(fixed_period_end)), 'Remaining months'] = end_of_fixed_to_end_of_mort
     df2.loc[(df2['Payment Date'] >= '2014-1-1') & (df2['Payment Date'] < '2019-1-1') & (df2['Payment Date'] > str(fixed_period_end)), 'Remaining months'] = (int_rate_1_period)
     df2.loc[(df2['Payment Date'] >= '2019-1-1') & (df2['Payment Date'] > str(fixed_period_end)), 'Remaining months'] = int_rate_2_period
-    df2.loc[(df2['Payment Date'] >= '2020-4-1'), 'Remaining months'] = end_of_break_to_end
+    df2.loc[(df2['Payment Date'] >= str(end_break_date)), 'Remaining months'] = end_of_break_to_end
     
-            
-    interest = df2['Interest Rate']/100 
- 
+    # assign interest rate and remaining period to each payment depending on date      
+    interest = df2['Interest Rate']/100  
     remaining_years = df2['Remaining months']
     
+    # assign ID to each mortgage 
     df2['Mortgage ID'] = count # gives each mortgage an ID
           
-    df2["Int"] = 0    
-        
-    ###################################
+    df2["Int"] = 0            
+    
+    #############################################################################
     # fixed period
     
     df2.loc[(df2['Payment Date'] <= str(fixed_period_end)) , 'Principal'] = original_mortgage  
     mortgage = df2['Principal']  
         
-    df2["Payment"] = -1 * npf.pmt(interest/12, remaining_years, mortgage) # df2["Principal Paid"] + df2["Interest Paid"]  
-    df2["Interest Paid"] =  -1 * npf.ipmt(interest/12, df2.index, remaining_years, mortgage) #(df2["Ending Balance"])*(df2["Interest Rate"])
-    df2["Principal Paid"] = -1 * npf.ppmt(interest/12, df2.index, remaining_years, mortgage) # df2["Payment"] - df2["Interest Paid"] 
+    # calculate PMT, interest and capital paid for each month
+    df2["Payment"] = -1 * npf.pmt(interest/12, remaining_years, mortgage)   
+    df2["Interest Paid"] =  -1 * npf.ipmt(interest/12, df2.index, remaining_years, mortgage) 
+    df2["Principal Paid"] = -1 * npf.ppmt(interest/12, df2.index, remaining_years, mortgage)  
     df2=df2.round(2)          
 
     df2["Ending Balance"] = 0.00
     df2.loc[1, "Ending Balance"] = original_mortgage - df2.loc[1, "Principal Paid"]
     df2
          
-    #df2.loc[1, 'Int payment'] = original_mortgage*(0.05/12)
-
-    for period in range(2, 25): #len(df2)+1):
+    # loop through each month to account for each payment and decrease remaining balance
+    for period in range(2, add_random_months + 1): 
         previous_balance = df2.loc[period-1, 'Ending Balance'].round(2)
         principal_paid = df2.loc[period, "Principal Paid"]
         
@@ -124,32 +165,39 @@ def create_df(count):
             continue
         elif principal_paid <= previous_balance:
             df2.loc[period, 'Ending Balance'] = previous_balance - principal_paid  
-            #df2.loc[period, 'Int payment'] = previous_balance*(0.05/12)
             df2.loc[period, 'Current balance'] = previous_balance.round(2)
             df2['Int'] = (df2["Current balance"]*(interest/12)).round(2)
             df2["Interest Paid"] = df2['Int']
             df2["To be paid"] = df2["Current balance"].round(2) + df2["Int"].round(2)
             df2["Ending Balance"] = df2["To be paid"] - df2["Payment"]
 
-    df2["Principal Paid"] = df2["Payment"] - df2["Int"]    
+    df2["Principal Paid"] = df2["Payment"] - df2["Int"]  
+    
+    
+    #############################################################################
+    # interest rate 1
 
-    idx2 = (df2['Payment Date'] == str(month_before_fixed_period_end)) #'2004-12-01') #str(fixed_period_end)) #str(month_before_fixed_period_end))
+    # find remaining balance at end of fixed period to recalculate PMT function when interest changes to 3%
+    idx2 = (df2['Payment Date'] == str(month_before_fixed_period_end)) 
     number2 = df2.loc[idx2, 'Ending Balance'].iat[0]
     print("Balance remaining at 2014-1-1 when interest changes to 3%: €"+ str(number2))
     df2.loc[(df2['Payment Date'] < '2014-1-1') & (df2['Payment Date'] >= str(fixed_period_end)) , 'Principal'] = number2
-    
-
-    #####################################
-    # interest rate 1
        
     mortgage = df2['Principal'] 
       
-    df2["Payment"] = -1 * npf.pmt(interest/12, remaining_years, mortgage) # df2["Principal Paid"] + df2["Interest Paid"]  
-    df2["Interest Paid"] =  -1 * npf.ipmt(interest/12, df2.index, remaining_years, mortgage) #(df2["Ending Balance"])*(df2["Interest Rate"])
-    df2["Principal Paid"] = -1 * npf.ppmt(interest/12, df2.index, remaining_years, mortgage) # df2["Payment"] - df2["Interest Paid"] 
+    # calculate PMT, interest and capital paid for each month with new interest rate of 3% and remaining balance found above
+    df2["Payment"] = -1 * npf.pmt(interest/12, remaining_years, mortgage)   
+    df2["Interest Paid"] =  -1 * npf.ipmt(interest/12, df2.index, remaining_years, mortgage) 
+    df2["Principal Paid"] = -1 * npf.ppmt(interest/12, df2.index, remaining_years, mortgage) 
     df2=df2.round(2)          
+    
+    # find period to start for loop at 3% interest
+    period_start1 = (df2['Payment Date'] == str(fixed_period_end))
+    period_start_number1 = ((years*12) - df2.loc[period_start1, 'Remaining period'].iat[0])+1   
+    #print("period_start_number1 " +str(period_start_number1)) 
 
-    for period in range(25, 133): #len(df2)+1):
+    # loop through each month to account for each payment and decrease remaining balance with new PMT amount and interest rate
+    for period in range(period_start_number1, len(df2)+1):
         previous_balance = df2.loc[period-1, 'Ending Balance'].round(2)
         principal_paid = df2.loc[period, "Principal Paid"]
         
@@ -158,7 +206,6 @@ def create_df(count):
             continue
         elif principal_paid <= previous_balance:
             df2.loc[period, 'Ending Balance'] = previous_balance - principal_paid  
-            #df2.loc[period, 'Int payment'] = previous_balance*(0.05/12)
             df2.loc[period, 'Current balance'] = previous_balance.round(2)
             df2['Int'] = abs(df2["Current balance"]*(interest/12)).round(2)
             df2["Interest Paid"] = abs(df2['Int'])
@@ -167,23 +214,29 @@ def create_df(count):
 
     df2["Principal Paid"] = df2["Payment"] - df2["Int"]    
 
+    #############################################################################
+    # interest rate 2
     
+    # find remaining balance at end of last period to recalculate PMT function when interest changes to 2.15%
     idx3 = (df2['Payment Date'] == '2013-12-01')
     number3 = df2.loc[idx3, 'Ending Balance'].iat[0]
     print("Balance remaining at 2014-1-1 when interest changes to 2.15%: " + str(number3))
-    df2.loc[(df2['Payment Date'] >= '2014-1-1') , 'Principal'] = number3
-    
-    ############################
-    # interest rate 2
-    
+    df2.loc[(df2['Payment Date'] >= '2014-1-1') & (df2['Payment Date'] < str(end_break_date)) , 'Principal'] = number3
+        
     mortgage = df2['Principal'] 
       
-    df2["Payment"] = -1 * npf.pmt(interest/12, remaining_years, mortgage) # df2["Principal Paid"] + df2["Interest Paid"]  
-    df2["Interest Paid"] =  -1 * npf.ipmt(interest/12, df2.index, remaining_years, mortgage) #(df2["Ending Balance"])*(df2["Interest Rate"])
-    df2["Principal Paid"] = -1 * npf.ppmt(interest/12, df2.index, remaining_years, mortgage) # df2["Payment"] - df2["Interest Paid"] 
+    # calculate PMT, interest and capital paid for each month with new interest rate of 2.15% and remaining balance found above
+    df2["Payment"] = -1 * npf.pmt(interest/12, remaining_years, mortgage)  
+    df2["Interest Paid"] =  -1 * npf.ipmt(interest/12, df2.index, remaining_years, mortgage) 
+    df2["Principal Paid"] = -1 * npf.ppmt(interest/12, df2.index, remaining_years, mortgage) 
     df2=df2.round(2)          
 
-    for period in range(133, 193): #len(df2)+1):
+    # find period to start for loop at 2.15% interest
+    period_start2 = (df2['Payment Date'] == '2014-01-01')
+    period_start_number2 = ((years*12) - df2.loc[period_start2, 'Remaining period'].iat[0])+1
+
+    # loop through each month to account for each payment and decrease remaining balance with new PMT amount and interest rate
+    for period in range(period_start_number2, len(df2)+1):
         previous_balance = df2.loc[period-1, 'Ending Balance'].round(2)
         principal_paid = df2.loc[period, "Principal Paid"]
         
@@ -192,7 +245,6 @@ def create_df(count):
             continue
         elif principal_paid <= previous_balance:
             df2.loc[period, 'Ending Balance'] = previous_balance - principal_paid  
-            #df2.loc[period, 'Int payment'] = previous_balance*(0.05/12)
             df2.loc[period, 'Current balance'] = previous_balance.round(2)
             df2['Int'] = abs(df2["Current balance"]*(interest/12)).round(2)
             df2["Interest Paid"] = abs(df2['Int'])
@@ -201,28 +253,37 @@ def create_df(count):
 
     df2["Principal Paid"] = df2["Payment"] - df2["Int"]
     
+    
+    #############################################################################
+    # interest rate 3
+    
+    # find remaining balance at end of last period to recalculate PMT function when interest changes to 1.15%
     idx4 = (df2['Payment Date'] == '2018-12-01')
     number4 = df2.loc[idx4, 'Ending Balance'].iat[0]
     print("Balance remaining at 2019-1-1 when interest changes to 1.15%: " + str(number4))
-    df2.loc[(df2['Payment Date'] >= '2019-1-1') & (df2['Payment Date'] < '2020-4-1') , 'Principal'] = number4
-    
-        
-    ##################################
-    # interest rate 3
-        
+    df2.loc[(df2['Payment Date'] >= '2019-1-1') & (df2['Payment Date'] < str(end_break_date)) , 'Principal'] = number4
+                           
     mortgage = df2['Principal'] 
       
-    df2["Payment"] = -1 * npf.pmt(interest/12, remaining_years, mortgage) # df2["Principal Paid"] + df2["Interest Paid"]  
-    df2["Interest Paid"] =  -1 * npf.ipmt(interest/12, df2.index, remaining_years, mortgage) #(df2["Ending Balance"])*(df2["Interest Rate"])
-    df2["Principal Paid"] = -1 * npf.ppmt(interest/12, df2.index, remaining_years, mortgage) # df2["Payment"] - df2["Interest Paid"] 
+    # calculate PMT, interest and capital paid for each month with new interest rate of 1.15% and remaining balance found above
+    df2["Payment"] = -1 * npf.pmt(interest/12, remaining_years, mortgage)  
+    df2["Interest Paid"] =  -1 * npf.ipmt(interest/12, df2.index, remaining_years, mortgage)
+    df2["Principal Paid"] = -1 * npf.ppmt(interest/12, df2.index, remaining_years, mortgage) 
     df2=df2.round(2)        
 
-    break1 = ((df2['Payment Date'] >= '2020-01-01') & (df2['Payment Date'] < '2020-04-01'))
+    ##############
+    # add break
+    break1 = ((df2['Payment Date'] >= str(start_break_date)) & (df2['Payment Date'] < str(end_break_date)))
     df2.loc[break1, 'Payment'] = 0
-
+    #############
     
-    for period in range(193, len(df2)+1):
-    #while(df2['Payment Date'] >= '2019-1-1'):
+    # find period to start for loop at 1.15% interest
+    period_start3 = (df2['Payment Date'] == '2019-01-01')
+    period_start_number3 = ((years*12) - df2.loc[period_start3, 'Remaining period'].iat[0])+1
+    #print("period_start_number3 " +str(period_start_number3)) 
+    
+    # loop through each month to account for each payment and decrease remaining balance with new PMT amount and interest rate
+    for period in range(period_start_number3, len(df2)+1):
         previous_balance = df2.loc[period-1, 'Ending Balance'].round(2)
         principal_paid = df2.loc[period, "Principal Paid"]
         
@@ -236,80 +297,49 @@ def create_df(count):
             df2["Interest Paid"] = abs(df2['Int'])
             df2["To be paid"] = df2["Current balance"].round(2) + df2["Int"].round(2)
             df2["Ending Balance"] = df2["To be paid"] - df2["Payment"]
-        
-    
-    idx5 = (df2['Payment Date'] == '2020-3-01')
-    number5 = df2.loc[idx5, 'Ending Balance'].iat[0]
-    print("Balance remaining at 2020-3-1 break ends: " + str(number5))
-    df2.loc[(df2['Payment Date'] >= '2020-4-1') , 'Principal'] = number5
-    
-    ####################
-    # re-adjust for break
             
-    mortgage = df2['Principal'] 
-      
-    df2["Payment"] = -1 * npf.pmt(interest/12, remaining_years, mortgage) # df2["Principal Paid"] + df2["Interest Paid"]  
-    df2["Interest Paid"] =  -1 * npf.ipmt(interest/12, df2.index, remaining_years, mortgage) #(df2["Ending Balance"])*(df2["Interest Rate"])
-    df2["Principal Paid"] = -1 * npf.ppmt(interest/12, df2.index, remaining_years, mortgage) # df2["Payment"] - df2["Interest Paid"] 
-    df2=df2.round(2)        
-    
-    break1 = ((df2['Payment Date'] >= '2020-01-01') & (df2['Payment Date'] < '2020-04-01'))
-    df2.loc[break1, 'Payment'] = 0
-    
-    for period in range(193, len(df2)+1):
-    #while(df2['Payment Date'] >= '2019-1-1'):
-        previous_balance = df2.loc[period-1, 'Ending Balance'].round(2)
-        principal_paid = df2.loc[period, "Principal Paid"]
-        
-        if previous_balance == 0:
-            df2.loc[period, ['Payment', 'Principal Paid', 'Interest Paid', 'Ending Balance']] == 0
-            continue
-        elif principal_paid <= previous_balance:
-            df2.loc[period, 'Ending Balance'] = previous_balance - principal_paid  
-            df2.loc[period, 'Current balance'] = previous_balance.round(2)
-            df2['Int'] = abs(df2["Current balance"]*(interest/12)).round(2)
-            df2["Interest Paid"] = abs(df2['Int'])
-            df2["To be paid"] = df2["Current balance"].round(2) + df2["Int"].round(2)
-            df2["Ending Balance"] = df2["To be paid"] - df2["Payment"]
-        
-            
-
-            
-    '''        
-    idx5 = (df2['Payment Date'] == '2020-3-01')
-    number5 = df2.loc[idx5, 'Ending Balance'].iat[0]
-    print("Balance remaining at 2020-3-1 break ends: " + str(number5))
-    df2.loc[(df2['Payment Date'] >= '2020-4-1') , 'Principal'] = number5
-
-    
-    ##################################
-    # break readjusting pmt
-        
-    mortgage = df2['Principal'] 
-      
-    df2["Payment"] = -1 * npf.pmt(interest/12, remaining_years, mortgage) # df2["Principal Paid"] + df2["Interest Paid"]  
-    df2["Interest Paid"] =  -1 * npf.ipmt(interest/12, df2.index, remaining_years, mortgage) #(df2["Ending Balance"])*(df2["Interest Rate"])
-    df2["Principal Paid"] = -1 * npf.ppmt(interest/12, df2.index, remaining_years, mortgage) # df2["Payment"] - df2["Interest Paid"] 
-    df2=df2.round(2)
-    
-               
-    for period in range(207, len(df2)+1):
-    #while(df2['Payment Date'] >= '2019-1-1'):
-        previous_balance = df2.loc[period-1, 'Ending Balance'].round(2)
-        principal_paid = df2.loc[period, "Principal Paid"]
-        
-        if previous_balance == 0:
-            df2.loc[period, ['Payment', 'Principal Paid', 'Interest Paid', 'Ending Balance']] == 0
-            continue
-        elif principal_paid <= previous_balance:
-            df2.loc[period, 'Ending Balance'] = previous_balance - principal_paid  
-            df2.loc[period, 'Current balance'] = previous_balance.round(2)
-            df2['Int'] = abs(df2["Current balance"]*(interest/12)).round(2)
-            df2["Interest Paid"] = abs(df2['Int'])
-            df2["To be paid"] = df2["Current balance"].round(2) + df2["Int"].round(2)
-            df2["Ending Balance"] = df2["To be paid"] - df2["Payment"]
-   ''' 
    
+    month_before_break_end = end_break_date - pd.DateOffset(months=1)    
+    
+    ############################################################################
+    # re-adjust for break
+    
+    # find remaining balance at end of last period to recalculate PMT function when mortgage break is finished
+    idx5 = (df2['Payment Date'] == str(month_before_break_end))
+    number5 = df2.loc[idx5, 'Ending Balance'].iat[0]
+    print("Balance remaining at " + str(end_break_date) + " when break ends: " + str(number5))
+    df2.loc[(df2['Payment Date'] >= str(end_break_date)) , 'Principal'] = number5
+            
+    mortgage = df2['Principal'] 
+      
+    # calculate PMT, interest and capital paid for each month after mortgage break using remaining balance found above
+    df2["Payment"] = -1 * npf.pmt(interest/12, remaining_years, mortgage)  
+    df2["Interest Paid"] =  -1 * npf.ipmt(interest/12, df2.index, remaining_years, mortgage)
+    df2["Principal Paid"] = -1 * npf.ppmt(interest/12, df2.index, remaining_years, mortgage) 
+    df2=df2.round(2)        
+    
+    ##############
+    # add break
+    break1 = ((df2['Payment Date'] >= str(start_break_date)) & (df2['Payment Date'] < str(end_break_date)))
+    df2.loc[break1, 'Payment'] = 0
+    #############
+       
+    for period in range(period_start_number3, len(df2)+1):
+        previous_balance = df2.loc[period-1, 'Ending Balance'].round(2)
+        principal_paid = df2.loc[period, "Principal Paid"]
+        
+        if previous_balance == 0:
+            df2.loc[period, ['Payment', 'Principal Paid', 'Interest Paid', 'Ending Balance']] == 0
+            continue
+        elif principal_paid <= previous_balance:
+            df2.loc[period, 'Ending Balance'] = previous_balance - principal_paid  
+            df2.loc[period, 'Current balance'] = previous_balance.round(2)
+            df2['Int'] = abs(df2["Current balance"]*(interest/12)).round(2)
+            df2["Interest Paid"] = abs(df2['Int'])
+            df2["To be paid"] = df2["Current balance"].round(2) + df2["Int"].round(2)
+            df2["Ending Balance"] = df2["To be paid"] - df2["Payment"]
+        
+   # manually fix last line of dataframe
     number5 = df2.loc[len(df2)-1, 'Payment']    
     df2.loc[len(df2), 'Payment'] = number5
     df2.loc[len(df2), 'Current balance'] = number5
@@ -328,13 +358,253 @@ def create_df(count):
     print("________________")
     return df2 
 
-master_DF = create_df(1)
+
+###############################################################################################
+######################################## PART 2 ###############################################
+############################# SAME DATAFRAME WITHOUT BREAK ####################################
     
+
+def create_df_without_break(count):    
+             
+    # global variables mean we can use same data from last function
+      
+    # create dataframe with blank columns and index the length of the mortgage   
+    rng = pd.date_range(start_date, periods=(years * payments_year), freq='MS')
+    rng.name = "Payment Date"
+    df2 = pd.DataFrame(index=rng, columns=['Remaining period', 'Current balance', 'Interest Rate', 'Payment', 'Principal Paid', 'Interest Paid', 'To be paid', 'Ending Balance'], dtype='float')
+    df2.reset_index(inplace=True)
+    df2.index += 1
+    df2.index.name = "Period" 
+    print("Length of mortgage in months: " + str(len(df2)))
+    remaining_period2 = ((int(len(df2))))
+    
+    df2['Remaining period'] = range(remaining_period2, 0, -1)
+    
+    ### length of each interest period in months
+    end_of_fixed_to_end_of_mort = (end_date.year - fixed_period_end.year)*12 + (end_date.month - fixed_period_end.month)
+    print("End of fixed period to end of mortgage: " + str(end_of_fixed_to_end_of_mort/12))
+    
+    int_rate_1_period = (end_date.year - date(2014, 1, 1).year)*12 + (end_date.month - date(2014, 1, 1).month)
+    print("Length of first period in years: " + str(int_rate_1_period/12))
+    
+    int_rate_2_period = (end_date.year - date(2019, 1, 1).year)*12 + (end_date.month - date(2019, 1, 1).month)
+    print("Length of second period in years: " + str(int_rate_2_period/12))
+         
+    # assign interest rate to each payment depending on date
+    df2.loc[df2['Payment Date'] < str(fixed_period_end), 'Interest Rate'] = 5           
+    df2.loc[(df2['Payment Date'] < '2014-1-1') & (df2['Payment Date'] >= str(fixed_period_end)), 'Interest Rate'] = 3
+    df2.loc[(df2['Payment Date'] >= '2014-1-1') & (df2['Payment Date'] < '2019-1-1') & (df2['Payment Date'] > str(fixed_period_end)), 'Interest Rate'] = 2.15
+    df2.loc[(df2['Payment Date'] >= '2019-1-1') & (df2['Payment Date'] > str(fixed_period_end)), 'Interest Rate'] = 1.15
+    
+    df2.loc[1, 'Current balance'] = original_mortgage
+    
+    # amount of payments remaining to calculate PMT function at each change in interest rate
+    df2.loc[df2['Payment Date'] < str(fixed_period_end), 'Remaining months'] = years*12
+    df2.loc[(df2['Payment Date'] < '2014-1-1') & (df2['Payment Date'] >= str(fixed_period_end)), 'Remaining months'] = end_of_fixed_to_end_of_mort
+    df2.loc[(df2['Payment Date'] >= '2014-1-1') & (df2['Payment Date'] < '2019-1-1') & (df2['Payment Date'] > str(fixed_period_end)), 'Remaining months'] = (int_rate_1_period)
+    df2.loc[(df2['Payment Date'] >= '2019-1-1') & (df2['Payment Date'] > str(fixed_period_end)), 'Remaining months'] = int_rate_2_period
+      
+    # assign interest rate and remaining period to each payment depending on date                
+    interest = df2['Interest Rate']/100 
+    remaining_years = df2['Remaining months']
+    
+    # assign ID to each mortgage
+    df2['Mortgage ID'] = count 
+          
+    df2["Int"] = 0    
+        
+    ############################################################################
+    # fixed period
+    
+    df2.loc[(df2['Payment Date'] <= str(fixed_period_end)) , 'Principal'] = original_mortgage  
+    mortgage = df2['Principal']  
+        
+    # calculate PMT, interest and capital paid for each month
+    df2["Payment"] = -1 * npf.pmt(interest/12, remaining_years, mortgage)  
+    df2["Interest Paid"] =  -1 * npf.ipmt(interest/12, df2.index, remaining_years, mortgage) 
+    df2["Principal Paid"] = -1 * npf.ppmt(interest/12, df2.index, remaining_years, mortgage)
+    df2=df2.round(2)          
+
+    df2["Ending Balance"] = 0.00
+    df2.loc[1, "Ending Balance"] = original_mortgage - df2.loc[1, "Principal Paid"]
+    df2
+         
+    # loop through each month to account for each payment and decrease remaining balance
+    for period in range(2, add_random_months + 1): 
+        previous_balance = df2.loc[period-1, 'Ending Balance'].round(2)
+        principal_paid = df2.loc[period, "Principal Paid"]
+        
+        if previous_balance == 0:
+            df2.loc[period, ['Payment', 'Principal Paid', 'Interest Paid', 'Ending Balance']] == 0
+            continue
+        elif principal_paid <= previous_balance:
+            df2.loc[period, 'Ending Balance'] = previous_balance - principal_paid  
+            df2.loc[period, 'Current balance'] = previous_balance.round(2)
+            df2['Int'] = (df2["Current balance"]*(interest/12)).round(2)
+            df2["Interest Paid"] = df2['Int']
+            df2["To be paid"] = df2["Current balance"].round(2) + df2["Int"].round(2)
+            df2["Ending Balance"] = df2["To be paid"] - df2["Payment"]
+
+    df2["Principal Paid"] = df2["Payment"] - df2["Int"]    
+
+
+    ############################################################################
+    # interest rate 1
+    
+    # find remaining balance at end of fixed period to recalculate PMT function when interest changes to 3%
+    idx2 = (df2['Payment Date'] == str(month_before_fixed_period_end)) 
+    number2 = df2.loc[idx2, 'Ending Balance'].iat[0]
+    print("Balance remaining at 2014-1-1 when interest changes to 3%: €"+ str(number2))
+    df2.loc[(df2['Payment Date'] < '2014-1-1') & (df2['Payment Date'] >= str(fixed_period_end)) , 'Principal'] = number2
+       
+    mortgage = df2['Principal'] 
+      
+    # calculate PMT, interest and capital paid for each month
+    df2["Payment"] = -1 * npf.pmt(interest/12, remaining_years, mortgage) 
+    df2["Interest Paid"] =  -1 * npf.ipmt(interest/12, df2.index, remaining_years, mortgage) 
+    df2["Principal Paid"] = -1 * npf.ppmt(interest/12, df2.index, remaining_years, mortgage) 
+    df2=df2.round(2)          
+    
+    # find period to start for loop at 3% interest
+    period_start1 = (df2['Payment Date'] == str(fixed_period_end))
+    period_start_number1 = ((years*12) - df2.loc[period_start1, 'Remaining period'].iat[0])+1   
+    print("period_start_number1 " +str(period_start_number1)) 
+
+    # loop through each month to account for each payment and decrease remaining balance with new PMT amount and interest rate
+    for period in range(period_start_number1, len(df2)+1):
+        previous_balance = df2.loc[period-1, 'Ending Balance'].round(2)
+        principal_paid = df2.loc[period, "Principal Paid"]
+        
+        if previous_balance == 0:
+            df2.loc[period, ['Payment', 'Principal Paid', 'Interest Paid', 'Ending Balance']] == 0
+            continue
+        elif principal_paid <= previous_balance:
+            df2.loc[period, 'Ending Balance'] = previous_balance - principal_paid  
+            #df2.loc[period, 'Int payment'] = previous_balance*(0.05/12)
+            df2.loc[period, 'Current balance'] = previous_balance.round(2)
+            df2['Int'] = abs(df2["Current balance"]*(interest/12)).round(2)
+            df2["Interest Paid"] = abs(df2['Int'])
+            df2["To be paid"] = df2["Current balance"].round(2) + df2["Int"].round(2)
+            df2["Ending Balance"] = df2["To be paid"] - df2["Payment"]
+
+    df2["Principal Paid"] = df2["Payment"] - df2["Int"]    
+    
+    
+    ###########################################################################
+    # interest rate 2
+    
+    # find remaining balance at end of fixed period to recalculate PMT function when interest changes to 2.15%
+    idx3 = (df2['Payment Date'] == '2013-12-01')
+    number3 = df2.loc[idx3, 'Ending Balance'].iat[0]
+    print("Balance remaining at 2014-1-1 when interest changes to 2.15%: " + str(number3))
+    df2.loc[(df2['Payment Date'] >= '2014-1-1') , 'Principal'] = number3
+    
+    mortgage = df2['Principal']
+    
+    # calculate PMT, interest and capital paid for each month
+    df2["Payment"] = -1 * npf.pmt(interest/12, remaining_years, mortgage)   
+    df2["Interest Paid"] =  -1 * npf.ipmt(interest/12, df2.index, remaining_years, mortgage) 
+    df2["Principal Paid"] = -1 * npf.ppmt(interest/12, df2.index, remaining_years, mortgage) 
+    df2=df2.round(2)          
+
+    # find period to start for loop at 2.15% interest
+    period_start2 = (df2['Payment Date'] == '2014-01-01')
+    period_start_number2 = ((years*12) - df2.loc[period_start2, 'Remaining period'].iat[0])+1
+    print("period_start_number2 " +str(period_start_number2))       
+
+    # loop through each month to account for each payment and decrease remaining balance with new PMT amount and interest rate
+    for period in range(period_start_number2, len(df2)+1): 
+        previous_balance = df2.loc[period-1, 'Ending Balance'].round(2)
+        principal_paid = df2.loc[period, "Principal Paid"]
+        
+        if previous_balance == 0:
+            df2.loc[period, ['Payment', 'Principal Paid', 'Interest Paid', 'Ending Balance']] == 0
+            continue
+        elif principal_paid <= previous_balance:
+            df2.loc[period, 'Ending Balance'] = previous_balance - principal_paid  
+            #df2.loc[period, 'Int payment'] = previous_balance*(0.05/12)
+            df2.loc[period, 'Current balance'] = previous_balance.round(2)
+            df2['Int'] = abs(df2["Current balance"]*(interest/12)).round(2)
+            df2["Interest Paid"] = abs(df2['Int'])
+            df2["To be paid"] = df2["Current balance"].round(2) + df2["Int"].round(2)
+            df2["Ending Balance"] = df2["To be paid"] - df2["Payment"]
+
+    df2["Principal Paid"] = df2["Payment"] - df2["Int"]
+    
+    
+    ##########################################################################
+    # interest rate 3
+    
+    # find remaining balance at end of fixed period to recalculate PMT function when interest changes to 2.15%
+    idx4 = (df2['Payment Date'] == '2018-12-01')
+    number4 = df2.loc[idx4, 'Ending Balance'].iat[0]
+    print("Balance remaining at 2019-1-1 when interest changes to 1.15%: " + str(number4))
+    df2.loc[(df2['Payment Date'] >= '2019-1-1'), 'Principal'] = number4
+        
+    mortgage = df2['Principal'] 
+      
+    # calculate PMT, interest and capital paid for each month
+    df2["Payment"] = -1 * npf.pmt(interest/12, remaining_years, mortgage)   
+    df2["Interest Paid"] =  -1 * npf.ipmt(interest/12, df2.index, remaining_years, mortgage) 
+    df2["Principal Paid"] = -1 * npf.ppmt(interest/12, df2.index, remaining_years, mortgage) 
+    df2=df2.round(2)        
+    
+    # find period to start for loop at 1.15% interest
+    period_start3 = (df2['Payment Date'] == '2019-01-01')
+    period_start_number3 = ((years*12) - df2.loc[period_start3, 'Remaining period'].iat[0])+1
+    print("period_start_number3 " +str(period_start_number3)) 
+    
+    # loop through each month to account for each payment and decrease remaining balance with new PMT amount and interest rate
+    for period in range(period_start_number3, len(df2)+1):
+        previous_balance = df2.loc[period-1, 'Ending Balance'].round(2)
+        principal_paid = df2.loc[period, "Principal Paid"]
+        
+        if previous_balance == 0:
+            df2.loc[period, ['Payment', 'Principal Paid', 'Interest Paid', 'Ending Balance']] == 0
+            continue
+        elif principal_paid <= previous_balance:
+            df2.loc[period, 'Ending Balance'] = previous_balance - principal_paid  
+            df2.loc[period, 'Current balance'] = previous_balance.round(2)
+            df2['Int'] = abs(df2["Current balance"]*(interest/12)).round(2)
+            df2["Interest Paid"] = abs(df2['Int'])
+            df2["To be paid"] = df2["Current balance"].round(2) + df2["Int"].round(2)
+            df2["Ending Balance"] = df2["To be paid"] - df2["Payment"]
+          
+            
+    # manually fix last line of dataframe  
+    number5 = df2.loc[len(df2)-1, 'Payment']    
+    df2.loc[len(df2), 'Payment'] = number5
+    df2.loc[len(df2), 'Current balance'] = number5
+    ending_interest = df2.loc[len(df2)-1, 'Interest Rate']
+    df2.loc[len(df2), 'Interest Paid'] = (number5*((ending_interest/12)/100)).round(2)
+    df2.loc[len(df2), 'Int'] = df2.loc[len(df2), 'Interest Paid'] 
+    
+    df2.loc[len(df2), 'To be paid'] = df2.loc[len(df2)-1, 'Ending Balance'] + df2.loc[len(df2), 'Interest Paid'] 
+    df2.loc[len(df2), 'Ending Balance'] = df2.loc[len(df2), 'To be paid'] - df2.loc[len(df2), 'Payment'] 
+     
+    df2["Principal Paid"] = df2["Payment"] - df2["Int"]
+    
+    df2.loc[len(df2), 'Principal Paid'] = number5 - (number5*((ending_interest/12)/100))
+       
+    print("________________")
+    return df2 
+
+# create dataframes
+master_DF = create_df(1)
+master_DF2 = create_df_without_break(1)
+ 
+# append new dataframe onto  existing dataframe   
 for x in range(0):
     df_two = create_df(x+2)
     #df_two.loc[len(df_two), "Payment"] == 0
     master_DF = master_DF.append(df_two, sort=False)
-   
+    
+    df_two2 = create_df_without_break(x+2)
+    #df_two.loc[len(df_two), "Payment"] == 0
+    master_DF2 = master_DF2.append(df_two2, sort=False)
+        
+##### totals of dataframe with mortgage break
+print("WITH MORTGAGE BREAK:")
 total_DF = pd.DataFrame((master_DF.groupby('Mortgage ID').sum()))
 del total_DF["Ending Balance"]
 del total_DF["Interest Rate"]
@@ -347,253 +617,9 @@ del total_DF["Principal"]
 print(total_DF)
 total_DF.to_csv('Total_DF.csv')
 master_DF.to_csv('PMT_DF.csv')
-
-
-
-###############################################################################################
-################## PART 2 ###############################################
-### SAME DATAFRAME WITHOUT BREAK ####################
-
-def create_df_without_break(count):    
     
-    # uniform distribution of term in years
-    years = 20 # random.randint(20,30)
-    print("Term in years: " + str(years))
-    
-    payments_year = 12
-        
-    # normal distribution to calculate mortgage amount
-    original_mortgage = 500000 #abs(np.round(normal(loc=400000, scale=150000),0)) #, size = 5000)
-    print("Mortgage principal: €"+ str(original_mortgage))
-
-    # start mortgage on 1st day of a random month between 2000 and 2005
-    beginning_date = datetime.date(2000, 1, 1) 
-    add_random_months = 36 #(random.randint(1,60))
-    start_date = (beginning_date + pd.DateOffset(months=add_random_months)).to_pydatetime().date()
-    print("Start date: " + str(start_date))
-    end_date = (start_date + pd.DateOffset(years=years)).to_pydatetime().date()
-    print("End date: " + str(end_date))     
-    
-    # pick a random number of years for the fixed period at 5%
-    fixed_years = 2 #(random.randint(1,3))
-    fixed_period_end = (start_date + pd.DateOffset(years=fixed_years)).to_pydatetime().date()
-    print("Fixed period: " + str(fixed_years) + " years")
-    print("End of fixed period: " + str(fixed_period_end))
-    month_before_fixed_period_end = fixed_period_end - pd.DateOffset(months=1)
-    print("Month before fixed period end " + str(month_before_fixed_period_end))
-    print("Fixed period interest: 5%")
-                   
-    rng = pd.date_range(start_date, periods=(years * payments_year), freq='MS')
-    rng.name = "Payment Date"
-    df2 = pd.DataFrame(index=rng, columns=['Remaining period', 'Current balance', 'Interest Rate', 'Payment', 'Principal Paid', 'Interest Paid', 'To be paid', 'Ending Balance'], dtype='float')
-    #df = pd.DataFrame(columns=['Payment', 'Principal Paid', 'Interest Paid', 'Ending Balance'], dtype='float')
-    df2.reset_index(inplace=True)
-    #df2.index = len(df2)
-    df2.index += 1
-    df2.index.name = "Period" 
-    #df2.string = str(df2.index)
-    print("Length of mortgage in months: " + str(len(df2)))
-    #remaining_period2 = len(df2)
-    remaining_period2 = ((int(len(df2))))
-    
-    df2['Remaining period'] = range(remaining_period2, 0, -1)
-    
-    end_of_fixed_to_end_of_mort = (end_date.year - fixed_period_end.year)*12 + (end_date.month - fixed_period_end.month)
-    print("End of fixed period to end of mortgage: " + str(end_of_fixed_to_end_of_mort/12))
-    
-    int_rate_1_period = (end_date.year - date(2014, 1, 1).year)*12 + (end_date.month - date(2014, 1, 1).month)
-    print("Length of first period in years: " + str(int_rate_1_period/12))
-    
-    int_rate_2_period = (end_date.year - date(2019, 1, 1).year)*12 + (end_date.month - date(2019, 1, 1).month)
-    print("Length of second period in years: " + str(int_rate_2_period/12))
-    
-
-     
-    df2.loc[df2['Payment Date'] < str(fixed_period_end), 'Interest Rate'] = 5           
-    df2.loc[(df2['Payment Date'] < '2014-1-1') & (df2['Payment Date'] >= str(fixed_period_end)), 'Interest Rate'] = 3
-    df2.loc[(df2['Payment Date'] >= '2014-1-1') & (df2['Payment Date'] < '2019-1-1') & (df2['Payment Date'] > str(fixed_period_end)), 'Interest Rate'] = 2.15
-    df2.loc[(df2['Payment Date'] >= '2019-1-1') & (df2['Payment Date'] > str(fixed_period_end)), 'Interest Rate'] = 1.15
-    # https://datatofish.com/if-condition-in-pandas-dataframe/   
-    
-    df2.loc[1, 'Current balance'] = original_mortgage
-    
-    df2.loc[df2['Payment Date'] < str(fixed_period_end), 'Remaining months'] = years*12
-    df2.loc[(df2['Payment Date'] < '2014-1-1') & (df2['Payment Date'] >= str(fixed_period_end)), 'Remaining months'] = end_of_fixed_to_end_of_mort
-    df2.loc[(df2['Payment Date'] >= '2014-1-1') & (df2['Payment Date'] < '2019-1-1') & (df2['Payment Date'] > str(fixed_period_end)), 'Remaining months'] = (int_rate_1_period)
-    df2.loc[(df2['Payment Date'] >= '2019-1-1') & (df2['Payment Date'] > str(fixed_period_end)), 'Remaining months'] = int_rate_2_period
-                
-    interest = df2['Interest Rate']/100 
- 
-    remaining_years = df2['Remaining months']
-    
-    df2['Mortgage ID'] = count # gives each mortgage an ID
-          
-    df2["Int"] = 0    
-        
-    ###################################
-    # fixed period
-    
-    df2.loc[(df2['Payment Date'] <= str(fixed_period_end)) , 'Principal'] = original_mortgage  
-    mortgage = df2['Principal']  
-        
-    df2["Payment"] = -1 * npf.pmt(interest/12, remaining_years, mortgage) # df2["Principal Paid"] + df2["Interest Paid"]  
-    df2["Interest Paid"] =  -1 * npf.ipmt(interest/12, df2.index, remaining_years, mortgage) #(df2["Ending Balance"])*(df2["Interest Rate"])
-    df2["Principal Paid"] = -1 * npf.ppmt(interest/12, df2.index, remaining_years, mortgage) # df2["Payment"] - df2["Interest Paid"] 
-    df2=df2.round(2)          
-
-    df2["Ending Balance"] = 0.00
-    df2.loc[1, "Ending Balance"] = original_mortgage - df2.loc[1, "Principal Paid"]
-    df2
-         
-    #df2.loc[1, 'Int payment'] = original_mortgage*(0.05/12)
-
-    for period in range(2, 25): #len(df2)+1):
-        previous_balance = df2.loc[period-1, 'Ending Balance'].round(2)
-        principal_paid = df2.loc[period, "Principal Paid"]
-        
-        if previous_balance == 0:
-            df2.loc[period, ['Payment', 'Principal Paid', 'Interest Paid', 'Ending Balance']] == 0
-            continue
-        elif principal_paid <= previous_balance:
-            df2.loc[period, 'Ending Balance'] = previous_balance - principal_paid  
-            #df2.loc[period, 'Int payment'] = previous_balance*(0.05/12)
-            df2.loc[period, 'Current balance'] = previous_balance.round(2)
-            df2['Int'] = (df2["Current balance"]*(interest/12)).round(2)
-            df2["Interest Paid"] = df2['Int']
-            df2["To be paid"] = df2["Current balance"].round(2) + df2["Int"].round(2)
-            df2["Ending Balance"] = df2["To be paid"] - df2["Payment"]
-
-    df2["Principal Paid"] = df2["Payment"] - df2["Int"]    
-
-    idx2 = (df2['Payment Date'] == str(month_before_fixed_period_end)) #'2004-12-01') #str(fixed_period_end)) #str(month_before_fixed_period_end))
-    number2 = df2.loc[idx2, 'Ending Balance'].iat[0]
-    print("Balance remaining at 2014-1-1 when interest changes to 3%: €"+ str(number2))
-    df2.loc[(df2['Payment Date'] < '2014-1-1') & (df2['Payment Date'] >= str(fixed_period_end)) , 'Principal'] = number2
-    
-
-    #####################################
-    # interest rate 1
-       
-    mortgage = df2['Principal'] 
-      
-    df2["Payment"] = -1 * npf.pmt(interest/12, remaining_years, mortgage) # df2["Principal Paid"] + df2["Interest Paid"]  
-    df2["Interest Paid"] =  -1 * npf.ipmt(interest/12, df2.index, remaining_years, mortgage) #(df2["Ending Balance"])*(df2["Interest Rate"])
-    df2["Principal Paid"] = -1 * npf.ppmt(interest/12, df2.index, remaining_years, mortgage) # df2["Payment"] - df2["Interest Paid"] 
-    df2=df2.round(2)          
-
-    for period in range(25, 133): #len(df2)+1):
-        previous_balance = df2.loc[period-1, 'Ending Balance'].round(2)
-        principal_paid = df2.loc[period, "Principal Paid"]
-        
-        if previous_balance == 0:
-            df2.loc[period, ['Payment', 'Principal Paid', 'Interest Paid', 'Ending Balance']] == 0
-            continue
-        elif principal_paid <= previous_balance:
-            df2.loc[period, 'Ending Balance'] = previous_balance - principal_paid  
-            #df2.loc[period, 'Int payment'] = previous_balance*(0.05/12)
-            df2.loc[period, 'Current balance'] = previous_balance.round(2)
-            df2['Int'] = abs(df2["Current balance"]*(interest/12)).round(2)
-            df2["Interest Paid"] = abs(df2['Int'])
-            df2["To be paid"] = df2["Current balance"].round(2) + df2["Int"].round(2)
-            df2["Ending Balance"] = df2["To be paid"] - df2["Payment"]
-
-    df2["Principal Paid"] = df2["Payment"] - df2["Int"]    
-
-    
-    idx3 = (df2['Payment Date'] == '2013-12-01')
-    number3 = df2.loc[idx3, 'Ending Balance'].iat[0]
-    print("Balance remaining at 2014-1-1 when interest changes to 2.15%: " + str(number3))
-    df2.loc[(df2['Payment Date'] >= '2014-1-1') , 'Principal'] = number3
-    
-    ############################
-    # interest rate 2
-    
-    mortgage = df2['Principal'] 
-      
-    df2["Payment"] = -1 * npf.pmt(interest/12, remaining_years, mortgage) # df2["Principal Paid"] + df2["Interest Paid"]  
-    df2["Interest Paid"] =  -1 * npf.ipmt(interest/12, df2.index, remaining_years, mortgage) #(df2["Ending Balance"])*(df2["Interest Rate"])
-    df2["Principal Paid"] = -1 * npf.ppmt(interest/12, df2.index, remaining_years, mortgage) # df2["Payment"] - df2["Interest Paid"] 
-    df2=df2.round(2)          
-
-    for period in range(133, 193): #len(df2)+1):
-        previous_balance = df2.loc[period-1, 'Ending Balance'].round(2)
-        principal_paid = df2.loc[period, "Principal Paid"]
-        
-        if previous_balance == 0:
-            df2.loc[period, ['Payment', 'Principal Paid', 'Interest Paid', 'Ending Balance']] == 0
-            continue
-        elif principal_paid <= previous_balance:
-            df2.loc[period, 'Ending Balance'] = previous_balance - principal_paid  
-            #df2.loc[period, 'Int payment'] = previous_balance*(0.05/12)
-            df2.loc[period, 'Current balance'] = previous_balance.round(2)
-            df2['Int'] = abs(df2["Current balance"]*(interest/12)).round(2)
-            df2["Interest Paid"] = abs(df2['Int'])
-            df2["To be paid"] = df2["Current balance"].round(2) + df2["Int"].round(2)
-            df2["Ending Balance"] = df2["To be paid"] - df2["Payment"]
-
-    df2["Principal Paid"] = df2["Payment"] - df2["Int"]
-    
-    idx4 = (df2['Payment Date'] == '2018-12-01')
-    number4 = df2.loc[idx4, 'Ending Balance'].iat[0]
-    print("Balance remaining at 2019-1-1 when interest changes to 1.15%: " + str(number4))
-    df2.loc[(df2['Payment Date'] >= '2019-1-1'), 'Principal'] = number4
-    
-        
-    ##################################
-    # interest rate 3
-        
-    mortgage = df2['Principal'] 
-      
-    df2["Payment"] = -1 * npf.pmt(interest/12, remaining_years, mortgage) # df2["Principal Paid"] + df2["Interest Paid"]  
-    df2["Interest Paid"] =  -1 * npf.ipmt(interest/12, df2.index, remaining_years, mortgage) #(df2["Ending Balance"])*(df2["Interest Rate"])
-    df2["Principal Paid"] = -1 * npf.ppmt(interest/12, df2.index, remaining_years, mortgage) # df2["Payment"] - df2["Interest Paid"] 
-    df2=df2.round(2)        
-
-
-    
-    for period in range(193, len(df2)+1):
-    #while(df2['Payment Date'] >= '2019-1-1'):
-        previous_balance = df2.loc[period-1, 'Ending Balance'].round(2)
-        principal_paid = df2.loc[period, "Principal Paid"]
-        
-        if previous_balance == 0:
-            df2.loc[period, ['Payment', 'Principal Paid', 'Interest Paid', 'Ending Balance']] == 0
-            continue
-        elif principal_paid <= previous_balance:
-            df2.loc[period, 'Ending Balance'] = previous_balance - principal_paid  
-            df2.loc[period, 'Current balance'] = previous_balance.round(2)
-            df2['Int'] = abs(df2["Current balance"]*(interest/12)).round(2)
-            df2["Interest Paid"] = abs(df2['Int'])
-            df2["To be paid"] = df2["Current balance"].round(2) + df2["Int"].round(2)
-            df2["Ending Balance"] = df2["To be paid"] - df2["Payment"]
-        
-
-   
-    number5 = df2.loc[len(df2)-1, 'Payment']    
-    df2.loc[len(df2), 'Payment'] = number5
-    df2.loc[len(df2), 'Current balance'] = number5
-    ending_interest = df2.loc[len(df2)-1, 'Interest Rate']
-    df2.loc[len(df2), 'Interest Paid'] = (number5*((ending_interest/12)/100)).round(2)
-    df2.loc[len(df2), 'Int'] = df2.loc[len(df2), 'Interest Paid'] 
-    
-    df2.loc[len(df2), 'To be paid'] = df2.loc[len(df2)-1, 'Ending Balance'] + df2.loc[len(df2), 'Interest Paid'] 
-    df2.loc[len(df2), 'Ending Balance'] = df2.loc[len(df2), 'To be paid'] - df2.loc[len(df2), 'Payment'] 
-     
-    df2["Principal Paid"] = df2["Payment"] - df2["Int"]
-    
-    df2.loc[len(df2), 'Principal Paid'] = number5 - (number5*((ending_interest/12)/100))
-    #df2.loc[len(df2), 'Ending Balance'] = 0
-       
-    print("________________")
-    return df2 
-
-master_DF2 = create_df_without_break(1)
-    
-for x in range(0):
-    df_two2 = create_df_without_break(x+2)
-    #df_two.loc[len(df_two), "Payment"] == 0
-    master_DF2 = master_DF2.append(df_two2, sort=False)
-   
+###### totals of dataframe without mortgage break
+print("\nWITHOUT MORTGAGE BREAK:")
 total_DF2 = pd.DataFrame((master_DF2.groupby('Mortgage ID').sum()))
 del total_DF2["Ending Balance"]
 del total_DF2["Interest Rate"]
@@ -607,9 +633,11 @@ print(total_DF2)
 total_DF2.to_csv('Total_DF2.csv')
 master_DF2.to_csv('PMT_DF2.csv')
 
-print("OVERCHARGE AMOUNT:")
+###### redress dataframe only
+print("\nOVERCHARGE AMOUNT:")
 redress_df = pd.DataFrame(columns=['Payment', 'Interest Paid'])
 redress_df['Payment'] = total_DF['Payment'] - total_DF2['Payment']
 #redress_df['Principal Paid'] = total_DF['Principal Paid'] - total_DF2['Principal Paid']
 redress_df['Interest Paid'] = total_DF['Interest Paid'] - total_DF2['Interest Paid']
 print(redress_df)
+redress_df.to_csv('redress_df.csv')
